@@ -14,16 +14,24 @@ import {
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Loader2, BookOpen } from "lucide-react";
 import Link from "next/link";
-import { DeckOptions } from "@/components/decks/deck-option"; // <--- IMPORT HERE (create this file)
+import { DeckOptions } from "@/components/decks/deck-option";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 export default function ViewDecks() {
   const [decks, setDecks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useUser();
   const client = useClerkSupabaseClient();
+  const [showSignInModal, setShowSignInModal] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
     async function loadDecks() {
       setLoading(true);
       const { data, error } = await client.from("decks").select();
@@ -44,13 +52,20 @@ export default function ViewDecks() {
   return (
     <main className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Your Decks</h1>
-        <Button asChild>
-          <Link href="/decks/create-deck">
+        <h1 className="text-3xl font-bold">All Decks</h1>
+        {user ? (
+          <Button asChild>
+            <Link href="/decks/create-deck">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Create Deck
+            </Link>
+          </Button>
+        ) : (
+          <Button onClick={() => setShowSignInModal(true)}>
             <PlusCircle className="mr-2 h-4 w-4" />
             Create Deck
-          </Link>
-        </Button>
+          </Button>
+        )}
       </div>
 
       {decks.length === 0 ? (
@@ -60,65 +75,97 @@ export default function ViewDecks() {
           <p className="text-muted-foreground mb-6">
             Create your first deck to get started
           </p>
-          <Button asChild>
-            <Link href="/decks/create-deck">
+          {user ? (
+            <Button asChild>
+              <Link href="/decks/create-deck">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Create Deck
+              </Link>
+            </Button>
+          ) : (
+            <Button onClick={() => setShowSignInModal(true)}>
               <PlusCircle className="mr-2 h-4 w-4" />
-              Create Your First Deck
-            </Link>
-          </Button>
+              Create Deck
+            </Button>
+          )}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 auto-rows-fr">
-          {/* Regular deck cards */}
-          {decks.map((deck) => (
-            <Card
-              key={deck.id}
-              className="flex flex-col justify-between hover:shadow-md transition-shadow p-4 relative"
-            >
-              <div className="absolute top-4 right-4">
-                <DeckOptions
-                  deckId={deck.id}
-                  onDelete={(id) => {
-                    setDecks((prev) => prev.filter((d) => d.id !== id));
-                  }}
-                />
-              </div>
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 auto-rows-fr">
+            {/* Regular deck cards */}
+            {decks.map((deck) => (
+              <Card
+                key={deck.id}
+                className="flex flex-col justify-between hover:shadow-md transition-shadow p-4 relative"
+              >
+                <div className="absolute top-4 right-4">
+                  <DeckOptions
+                    deckId={deck.id}
+                    onDelete={(id) => {
+                      setDecks((prev) => prev.filter((d) => d.id !== id));
+                    }}
+                  />
+                </div>
 
-              <div className="flex flex-col gap-4 flex-grow">
-                <CardHeader className="p-0">
-                  <CardTitle className="text-lg">
-                    {deck.title || "Untitled Deck"}
-                  </CardTitle>
-                  <CardDescription className="line-clamp-2 text-sm text-muted-foreground">
-                    {deck.description || "No description provided"}
-                  </CardDescription>
-                </CardHeader>
+                <div className="flex flex-col gap-4 flex-grow">
+                  <CardHeader className="p-0">
+                    <CardTitle className="text-lg">
+                      {deck.title || "Untitled Deck"}
+                    </CardTitle>
+                    <CardDescription className="line-clamp-2 text-sm text-muted-foreground">
+                      {deck.description || "No description provided"}
+                    </CardDescription>
+                  </CardHeader>
 
-                <CardContent className="p-0 flex items-center gap-2 text-sm text-muted-foreground">
-                  <BookOpen className="h-4 w-4" />
-                  <span>{deck.cards?.length || 0} cards</span>
-                </CardContent>
-              </div>
+                  <CardContent className="p-0 flex items-center gap-2 text-sm text-muted-foreground">
+                    <BookOpen className="h-4 w-4" />
+                    <span>{deck.cards?.length || 0} cards</span>
+                  </CardContent>
+                </div>
 
-              <CardFooter className="p-0 pt-4">
-                <Button asChild variant="outline" className="w-full">
-                  <Link href={`/decks/${deck.id}`}>View Deck</Link>
+                <CardFooter className="p-0 pt-4">
+                  {user ? (
+                    <Button asChild variant="outline" className="w-full">
+                      <Link href={`/decks/${deck.id}`}>View Deck</Link>
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setShowSignInModal(true)}
+                    >
+                      View Deck
+                    </Button>
+                  )}
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
+
+          {/* Sign In Modal */}
+          <Dialog open={showSignInModal} onOpenChange={setShowSignInModal}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Sign In Required</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">
+                You must be signed in to view a deck. Please log in or create an
+                account.
+              </p>
+              <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowSignInModal(false)}
+                >
+                  Cancel
                 </Button>
-              </CardFooter>
-            </Card>
-          ))}
-
-          {/* Create new deck card */}
-          <Card className="border-dashed hover:border-solid hover:bg-muted/50 transition-colors cursor-pointer flex flex-col items-center justify-center p-6">
-            <Link
-              href="/decks/create-deck"
-              className="flex flex-col items-center justify-center gap-4 text-center h-full"
-            >
-              <PlusCircle className="h-12 w-12 text-muted-foreground" />
-              <p className="text-lg font-medium">Create New Deck</p>
-            </Link>
-          </Card>
-        </div>
+                <Button asChild>
+                  <Link href="/auth/sign-in">Sign In</Link>
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
       )}
     </main>
   );
