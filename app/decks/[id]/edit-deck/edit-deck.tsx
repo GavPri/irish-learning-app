@@ -1,24 +1,24 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useClerkSupabaseClient } from "@/hooks/supbase/useClerkSupabaseClient";
 import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Form,
   FormField,
   FormItem,
   FormLabel,
   FormControl,
-  FormDescription,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useClerkSupabaseClient } from "@/hooks/supbase/useClerkSupabaseClient";
-import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -28,9 +28,12 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
-const Page = () => {
+const EditDeckPage = () => {
+  const { id } = useParams<{ id: string }>(); // get deck id from URL
+  const router = useRouter();
   const client = useClerkSupabaseClient();
-  const router = useRouter()
+
+  const [loading, setLoading] = useState(true);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -41,29 +44,58 @@ const Page = () => {
     },
   });
 
+  useEffect(() => {
+    async function fetchDeck() {
+      if (!id) return;
+      setLoading(true);
+
+      const { data, error } = await client
+        .from("decks")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (error) {
+        console.error("Error fetching deck:", error.message);
+      } else if (data) {
+        form.reset({
+          title: data.title || "",
+          description: data.description || "",
+          is_public: data.is_public ?? true,
+        });
+      }
+
+      setLoading(false);
+    }
+
+    fetchDeck();
+  }, [id, form]);
+
   async function onSubmit(values: FormData) {
     const { data, error } = await client
       .from("decks")
-      .insert(values)
-      .select()
-      .single();
+      .update(values)
+      .eq("id", id);
 
     if (error) {
-      console.error("Error creating deck:", error.message);
+      console.error("Error updating deck:", error.message);
     } else {
-      console.log("Deck created successfully:", data);
-      form.reset();
-
-      if (data?.id) {
-        router.push(`/decks/${data.id}`); // ✅ redirect to the new deck by ID
-      }
+      console.log("Deck updated successfully:", data);
+      router.push("/decks/view-decks"); 
     }
   }
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-md mx-auto py-10">
-      <h1 className="text-3xl font-bold mb-6">Create a Deck</h1>
+      <h1 className="text-3xl font-bold mb-6">Edit Deck</h1>
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -112,7 +144,7 @@ const Page = () => {
           />
 
           <Button type="submit" className="w-full">
-            Create Deck
+            Update Deck
           </Button>
         </form>
       </Form>
@@ -120,4 +152,4 @@ const Page = () => {
   );
 };
 
-export default Page;
+export default EditDeckPage;
